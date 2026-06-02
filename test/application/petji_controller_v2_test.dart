@@ -60,6 +60,81 @@ void main() {
     expect(controller.state.todos.single.status, TodoStatus.done);
   });
 
+  test('deletes timeline events, todos, expenses, and updates pet avatar', () {
+    final scheduler = FakeNotificationScheduler();
+    final now = DateTime(2026, 6, 1, 8);
+    final controller = PetjiController(
+      AppSnapshot.empty(now: now),
+      notificationScheduler: scheduler,
+      clock: () => now,
+    );
+    final pet = controller.registerPet(
+      name: 'Momo',
+      species: PetSpecies.cat,
+      breed: '',
+      birthday: DateTime(2024, 1, 15),
+    );
+    final event = controller.addTimelineEvent(happenedAt: now, title: '换了新窝');
+    final todo = controller.addTodo(title: '预约疫苗', dueAt: now);
+    final expense = controller.addExpense(title: '猫砂', amountCents: 1000);
+
+    controller.updatePetAvatar(pet.id, 'avatars/momo.png');
+    controller.deleteTimelineEvent(event.id);
+    controller.deleteTodo(todo.id);
+    controller.deleteExpense(expense.id);
+
+    expect(controller.state.currentPet?.avatarPath, 'avatars/momo.png');
+    expect(controller.state.timelineEvents, isEmpty);
+    expect(controller.state.todos, isEmpty);
+    expect(controller.state.expenses, isEmpty);
+    expect(scheduler.canceledTodoIds, contains(todo.id));
+  });
+
+  test('updates active pet basic profile without changing owned data', () {
+    final now = DateTime(2026, 6, 1, 8);
+    final updatedAt = DateTime(2026, 6, 2, 9);
+    var currentClock = now;
+    final controller = PetjiController(
+      AppSnapshot.empty(now: now),
+      clock: () => currentClock,
+    );
+    final pet = controller.registerPet(
+      name: 'Momo',
+      species: PetSpecies.cat,
+      breed: '英国短毛猫',
+      birthday: DateTime(2024, 1, 15),
+      sex: PetSex.female,
+      isNeutered: false,
+      notes: '爱晒太阳',
+    );
+    final weight = controller.addWeight(grams: 4200);
+
+    currentClock = updatedAt;
+    controller.updatePetProfile(
+      petId: pet.id,
+      name: '豆包',
+      species: PetSpecies.dog,
+      breed: '柴犬',
+      birthday: DateTime(2023, 3, 20),
+      sex: PetSex.male,
+      isNeutered: true,
+      notes: '对鸡肉过敏',
+    );
+
+    final updated = controller.state.currentPet!;
+    expect(updated.id, pet.id);
+    expect(updated.name, '豆包');
+    expect(updated.species, PetSpecies.dog);
+    expect(updated.breed, '柴犬');
+    expect(updated.birthday, DateTime(2023, 3, 20));
+    expect(updated.sex, PetSex.male);
+    expect(updated.isNeutered, isTrue);
+    expect(updated.notes, '对鸡肉过敏');
+    expect(updated.updatedAt, updatedAt);
+    expect(controller.state.weightRecords.single.id, weight.id);
+    expect(controller.state.weightRecords.single.petId, pet.id);
+  });
+
   test(
     'addCare stores file and media paths, creates timeline event and reminder',
     () {

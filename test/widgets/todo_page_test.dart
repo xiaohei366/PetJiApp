@@ -35,6 +35,22 @@ void main() {
     expect(find.text('已完成'), findsOneWidget);
   });
 
+  testWidgets('todo day item can be deleted', (tester) async {
+    await tester.pumpWidget(PetjiApp(initialSnapshot: _snapshotWithTodo()));
+
+    await tester.tap(find.text('待办'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('日').first);
+    await tester.pumpAndSettle();
+    await tester.tap(find.byTooltip('删除待办 预约疫苗'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('确认删除'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('待办已删除'), findsOneWidget);
+    expect(find.text('预约疫苗'), findsNothing);
+  });
+
   testWidgets('todo page switches year month and day views', (tester) async {
     await tester.pumpWidget(PetjiApp(initialSnapshot: _snapshotWithTodo()));
 

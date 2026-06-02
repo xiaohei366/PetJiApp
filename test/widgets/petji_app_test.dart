@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:petji/domain/models.dart';
+import 'package:petji/domain/pet_breeds.dart';
 import 'package:petji/presentation/petji_app.dart';
 
 void main() {
@@ -36,6 +37,24 @@ void main() {
     expect(find.text('本月消费'), findsOneWidget);
     expect(find.text('近期提醒'), findsNothing);
     expect(find.text('今日喂食'), findsNothing);
+  });
+
+  testWidgets('dashboard vaccine metric shows neutered status', (tester) async {
+    await tester.pumpWidget(
+      PetjiApp(initialSnapshot: AppSnapshot.seed(now: DateTime(2026, 6, 1))),
+    );
+
+    expect(find.text('已绝育'), findsOneWidget);
+  });
+
+  testWidgets('dashboard vaccine metric shows unneutered status', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      PetjiApp(initialSnapshot: _singleUnneuteredPetSnapshot()),
+    );
+
+    expect(find.text('未绝育'), findsOneWidget);
   });
 
   testWidgets('quick feeding and weight forms update the dashboard', (
@@ -114,6 +133,74 @@ void main() {
     expect(find.byTooltip('切换宠物 Bao'), findsOneWidget);
   });
 
+  testWidgets('dashboard pet header exposes avatar change action', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      PetjiApp(initialSnapshot: AppSnapshot.seed(now: DateTime(2026, 6, 1))),
+    );
+
+    await tester.tap(find.bySemanticsLabel('更换 Momo 头像'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('更换头像'), findsOneWidget);
+    expect(find.text('从相册选择'), findsOneWidget);
+  });
+
+  testWidgets('dashboard pet header edits current pet basic profile', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      PetjiApp(initialSnapshot: AppSnapshot.seed(now: DateTime(2026, 6, 1))),
+    );
+
+    await tester.tap(find.bySemanticsLabel('编辑 Momo 基本信息'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('编辑宠物档案'), findsOneWidget);
+    await tester.enterText(find.bySemanticsLabel('宠物姓名输入框'), '豆包');
+    await tester.tap(find.text('狗'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byType(DropdownButtonFormField<String>));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('柴犬').last);
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('公'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.widgetWithText(CheckboxListTile, '已绝育'));
+    await tester.enterText(find.bySemanticsLabel('宠物备注输入框'), '对鸡肉过敏');
+    await tester.tap(find.text('保存修改'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('豆包'), findsWidgets);
+    expect(find.textContaining('柴犬'), findsOneWidget);
+    expect(find.text('档案已更新'), findsOneWidget);
+    expect(find.byTooltip('切换宠物 豆包'), findsOneWidget);
+  });
+
+  testWidgets(
+    'pet onboarding exposes preset cat dog breeds and custom option',
+    (tester) async {
+      await tester.pumpWidget(
+        PetjiApp(initialSnapshot: AppSnapshot.empty(now: DateTime(2026, 6, 1))),
+      );
+
+      await tester.tap(find.byType(DropdownButtonFormField<String>));
+      await tester.pumpAndSettle();
+      expect(find.text('英国短毛猫'), findsOneWidget);
+      expect(catBreedOptions.last, customBreedOption);
+      await tester.tap(find.text('英国短毛猫').last);
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('狗'));
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.byType(DropdownButtonFormField<String>));
+      await tester.pumpAndSettle();
+      expect(find.text('拉布拉多寻回犬'), findsOneWidget);
+      expect(dogBreedOptions.last, customBreedOption);
+    },
+  );
+
   testWidgets('dashboard recent activity preview is capped and has view all', (
     tester,
   ) async {
@@ -146,6 +233,22 @@ AppSnapshot _twoPetSnapshot() {
     updatedAt: now,
   );
   return seed.copyWith(pets: [...seed.pets, second]);
+}
+
+AppSnapshot _singleUnneuteredPetSnapshot() {
+  final now = DateTime(2026, 6, 1);
+  final pet = PetProfile(
+    id: 'pet-unneutered',
+    name: '团子',
+    species: PetSpecies.cat,
+    breed: '中华田园猫',
+    birthday: DateTime(2025, 1, 1),
+    sex: PetSex.unknown,
+    isNeutered: false,
+    createdAt: now,
+    updatedAt: now,
+  );
+  return AppSnapshot.empty(now: now).copyWith(activePetId: pet.id, pets: [pet]);
 }
 
 AppSnapshot _timelineHeavySnapshot() {

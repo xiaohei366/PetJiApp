@@ -12,6 +12,7 @@ import '../../application/petji_analytics.dart';
 import '../../domain/models.dart';
 import '../formatters.dart';
 import '../theme/petji_theme.dart';
+import '../widgets/breed_selector.dart';
 import '../widgets/info_card.dart';
 
 class DashboardPage extends ConsumerWidget {
@@ -114,7 +115,13 @@ class DashboardPage extends ConsumerWidget {
           ],
         ),
         const SizedBox(height: 20),
-        _PetHeader(pet: pet, asOf: now),
+        _PetHeader(
+          pet: pet,
+          asOf: now,
+          onChangeAvatar: () => _showAvatarDialog(context, ref, pet),
+          onEditProfile: () =>
+              _showPetProfileDialog(context, ref, initialPet: pet),
+        ),
         const SizedBox(height: 16),
         LayoutBuilder(
           builder: (context, constraints) {
@@ -141,6 +148,7 @@ class DashboardPage extends ConsumerWidget {
                   width: width,
                   label: '疫苗',
                   value: '$vaccineCount次',
+                  helper: pet.isNeutered ? '已绝育' : '未绝育',
                   icon: Icons.vaccines_outlined,
                 ),
                 _MetricCard(
@@ -286,94 +294,49 @@ class DashboardPage extends ConsumerWidget {
     );
   }
 
-  void _showPetProfileDialog(BuildContext context, WidgetRef ref) {
-    final nameController = TextEditingController();
-    final formKey = GlobalKey<FormState>();
-    var birthday = DateTime.now();
-    String? avatarPath;
+  void _showPetProfileDialog(
+    BuildContext context,
+    WidgetRef ref, {
+    PetProfile? initialPet,
+  }) {
     showDialog<void>(
       context: context,
-      builder: (dialogContext) {
-        return StatefulBuilder(
-          builder: (context, setDialogState) {
-            return AlertDialog(
-              title: const Text('新增宠物'),
-              content: SingleChildScrollView(
-                child: Form(
-                  key: formKey,
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
-                      TextFormField(
-                        controller: nameController,
-                        autofocus: true,
-                        decoration: const InputDecoration(labelText: '宠物姓名'),
-                        validator: (value) =>
-                            value == null || value.trim().isEmpty
-                            ? '请填写宠物姓名'
-                            : null,
-                      ),
-                      const SizedBox(height: 12),
-                      OutlinedButton.icon(
-                        onPressed: () async {
-                          final selected = await showDatePicker(
-                            context: context,
-                            initialDate: birthday,
-                            firstDate: DateTime(1990),
-                            lastDate: DateTime.now(),
-                            confirmText: '确定',
-                            cancelText: '取消',
-                          );
-                          if (selected != null) {
-                            setDialogState(() => birthday = selected);
-                          }
-                        },
-                        icon: const Icon(Icons.cake_outlined),
-                        label: Text('生日 ${dateLabel(birthday)}'),
-                      ),
-                      const SizedBox(height: 12),
-                      OutlinedButton.icon(
-                        onPressed: () async {
-                          final path = await _pickManagedAvatar();
-                          if (path != null) {
-                            setDialogState(() => avatarPath = path);
-                          }
-                        },
-                        icon: const Icon(Icons.photo_outlined),
-                        label: Text(avatarPath == null ? '选择头像' : '已选择头像'),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-              actions: [
-                TextButton(
-                  onPressed: () => Navigator.of(dialogContext).pop(),
-                  child: const Text('取消'),
-                ),
-                FilledButton(
-                  onPressed: () {
-                    if (!formKey.currentState!.validate()) {
-                      return;
-                    }
-                    final controller = ref.read(appSnapshotProvider.notifier);
-                    final pet = controller.registerPet(
-                      name: nameController.text,
-                      birthday: birthday,
-                      avatarPath: avatarPath,
-                    );
-                    controller.switchActivePet(pet.id);
-                    Navigator.of(dialogContext).pop();
-                    _showMessage(context, '宠物档案已新增');
-                  },
-                  child: const Text('保存宠物档案'),
-                ),
-              ],
+      builder: (dialogContext) => _PetProfileDialog(
+        initialPet: initialPet,
+        onPickAvatar: _pickManagedAvatar,
+        onCancel: () => Navigator.of(dialogContext).pop(),
+        onSave: (draft) {
+          final controller = ref.read(appSnapshotProvider.notifier);
+          if (initialPet == null) {
+            final pet = controller.registerPet(
+              name: draft.name,
+              species: draft.species,
+              breed: draft.breed,
+              birthday: draft.birthday,
+              sex: draft.sex,
+              isNeutered: draft.isNeutered,
+              avatarPath: draft.avatarPath,
+              notes: draft.notes,
             );
-          },
-        );
-      },
+            controller.switchActivePet(pet.id);
+            Navigator.of(dialogContext).pop();
+            _showMessage(context, '宠物档案已新增');
+            return;
+          }
+          controller.updatePetProfile(
+            petId: initialPet.id,
+            name: draft.name,
+            species: draft.species,
+            breed: draft.breed,
+            birthday: draft.birthday,
+            sex: draft.sex,
+            isNeutered: draft.isNeutered,
+            notes: draft.notes,
+          );
+          Navigator.of(dialogContext).pop();
+          _showMessage(context, '档案已更新');
+        },
+      ),
     );
   }
 
@@ -393,6 +356,39 @@ class DashboardPage extends ConsumerWidget {
     );
     await File(picked.path).copy(target.path);
     return target.path;
+  }
+
+  void _showAvatarDialog(BuildContext context, WidgetRef ref, PetProfile pet) {
+    showDialog<void>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('更换头像'),
+        content: Text('为 ${pet.name} 选择新的档案头像。'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(),
+            child: const Text('取消'),
+          ),
+          FilledButton.icon(
+            onPressed: () async {
+              final path = await _pickManagedAvatar();
+              if (path == null) {
+                return;
+              }
+              ref
+                  .read(appSnapshotProvider.notifier)
+                  .updatePetAvatar(pet.id, path);
+              if (context.mounted) {
+                Navigator.of(dialogContext).pop();
+                _showMessage(context, '头像已更新');
+              }
+            },
+            icon: const Icon(Icons.photo_library_outlined),
+            label: const Text('从相册选择'),
+          ),
+        ],
+      ),
+    );
   }
 
   void _showDeletePetConfirmation(
@@ -617,6 +613,234 @@ class DashboardPage extends ConsumerWidget {
   }
 }
 
+class _PetProfileDraft {
+  const _PetProfileDraft({
+    required this.name,
+    required this.species,
+    required this.breed,
+    required this.birthday,
+    required this.sex,
+    required this.isNeutered,
+    required this.avatarPath,
+    required this.notes,
+  });
+
+  final String name;
+  final PetSpecies species;
+  final String breed;
+  final DateTime birthday;
+  final PetSex sex;
+  final bool isNeutered;
+  final String? avatarPath;
+  final String? notes;
+}
+
+class _PetProfileDialog extends StatefulWidget {
+  const _PetProfileDialog({
+    required this.onPickAvatar,
+    required this.onCancel,
+    required this.onSave,
+    this.initialPet,
+  });
+
+  final PetProfile? initialPet;
+  final Future<String?> Function() onPickAvatar;
+  final VoidCallback onCancel;
+  final ValueChanged<_PetProfileDraft> onSave;
+
+  @override
+  State<_PetProfileDialog> createState() => _PetProfileDialogState();
+}
+
+class _PetProfileDialogState extends State<_PetProfileDialog> {
+  final _formKey = GlobalKey<FormState>();
+  late final TextEditingController _nameController;
+  late final TextEditingController _notesController;
+  late PetSpecies _species;
+  late String _breed;
+  late DateTime _birthday;
+  late PetSex _sex;
+  late bool _isNeutered;
+  late String? _avatarPath;
+
+  bool get _isEditing => widget.initialPet != null;
+
+  @override
+  void initState() {
+    super.initState();
+    final pet = widget.initialPet;
+    _nameController = TextEditingController(text: pet?.name ?? '');
+    _notesController = TextEditingController(text: pet?.notes ?? '');
+    _species = pet?.species ?? PetSpecies.cat;
+    _breed = pet?.breed ?? '';
+    _birthday = pet?.birthday ?? DateTime.now();
+    _sex = pet?.sex ?? PetSex.unknown;
+    _isNeutered = pet?.isNeutered ?? false;
+    _avatarPath = pet?.avatarPath;
+  }
+
+  @override
+  void dispose() {
+    _nameController.dispose();
+    _notesController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: Text(_isEditing ? '编辑宠物档案' : '新增宠物'),
+      content: SingleChildScrollView(
+        child: Form(
+          key: _formKey,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              if (!_isEditing) ...[
+                OutlinedButton.icon(
+                  onPressed: _pickAvatar,
+                  icon: const Icon(Icons.photo_outlined),
+                  label: Text(_avatarPath == null ? '选择头像' : '已选择头像'),
+                ),
+                const SizedBox(height: 12),
+              ],
+              Semantics(
+                label: '宠物姓名输入框',
+                textField: true,
+                child: TextFormField(
+                  controller: _nameController,
+                  autofocus: true,
+                  decoration: const InputDecoration(labelText: '宠物姓名'),
+                  validator: (value) =>
+                      value == null || value.trim().isEmpty ? '请填写宠物姓名' : null,
+                ),
+              ),
+              const SizedBox(height: 12),
+              SegmentedButton<PetSpecies>(
+                segments: const [
+                  ButtonSegment(
+                    value: PetSpecies.cat,
+                    label: Text('猫'),
+                    icon: Icon(Icons.pets_outlined),
+                  ),
+                  ButtonSegment(
+                    value: PetSpecies.dog,
+                    label: Text('狗'),
+                    icon: Icon(Icons.cruelty_free_outlined),
+                  ),
+                  ButtonSegment(
+                    value: PetSpecies.other,
+                    label: Text('其他'),
+                    icon: Icon(Icons.favorite_border),
+                  ),
+                ],
+                selected: {_species},
+                onSelectionChanged: (selection) {
+                  setState(() {
+                    _species = selection.first;
+                    _breed = '';
+                  });
+                },
+              ),
+              const SizedBox(height: 12),
+              BreedSelector(
+                key: ValueKey(_species),
+                species: _species,
+                initialBreed: _breed,
+                onChanged: (value) => _breed = value,
+              ),
+              const SizedBox(height: 12),
+              OutlinedButton.icon(
+                onPressed: _pickBirthday,
+                icon: const Icon(Icons.cake_outlined),
+                label: Text('生日 ${dateLabel(_birthday)}'),
+              ),
+              const SizedBox(height: 12),
+              SegmentedButton<PetSex>(
+                segments: const [
+                  ButtonSegment(value: PetSex.unknown, label: Text('未知')),
+                  ButtonSegment(value: PetSex.male, label: Text('公')),
+                  ButtonSegment(value: PetSex.female, label: Text('母')),
+                ],
+                selected: {_sex},
+                showSelectedIcon: false,
+                onSelectionChanged: (selection) =>
+                    setState(() => _sex = selection.first),
+              ),
+              const SizedBox(height: 8),
+              CheckboxListTile(
+                contentPadding: EdgeInsets.zero,
+                title: const Text('已绝育'),
+                value: _isNeutered,
+                onChanged: (value) =>
+                    setState(() => _isNeutered = value ?? false),
+              ),
+              Semantics(
+                label: '宠物备注输入框',
+                textField: true,
+                child: TextFormField(
+                  controller: _notesController,
+                  minLines: 2,
+                  maxLines: 3,
+                  decoration: const InputDecoration(labelText: '备注（可选）'),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+      actions: [
+        TextButton(onPressed: widget.onCancel, child: const Text('取消')),
+        FilledButton(
+          onPressed: _submit,
+          child: Text(_isEditing ? '保存修改' : '保存宠物档案'),
+        ),
+      ],
+    );
+  }
+
+  Future<void> _pickAvatar() async {
+    final path = await widget.onPickAvatar();
+    if (mounted && path != null) {
+      setState(() => _avatarPath = path);
+    }
+  }
+
+  Future<void> _pickBirthday() async {
+    final selected = await showDatePicker(
+      context: context,
+      initialDate: _birthday,
+      firstDate: DateTime(1990),
+      lastDate: DateTime.now(),
+      confirmText: '确定',
+      cancelText: '取消',
+    );
+    if (selected != null) {
+      setState(() => _birthday = selected);
+    }
+  }
+
+  void _submit() {
+    if (!_formKey.currentState!.validate()) {
+      return;
+    }
+    final notes = _notesController.text.trim();
+    widget.onSave(
+      _PetProfileDraft(
+        name: _nameController.text,
+        species: _species,
+        breed: _breed,
+        birthday: _birthday,
+        sex: _sex,
+        isNeutered: _isNeutered,
+        avatarPath: _avatarPath,
+        notes: notes.isEmpty ? null : notes,
+      ),
+    );
+  }
+}
+
 class _CareDialog extends StatefulWidget {
   const _CareDialog({
     required this.initialDate,
@@ -783,14 +1007,23 @@ class _ReportDialogState extends State<_ReportDialog> {
 }
 
 class _PetHeader extends StatelessWidget {
-  const _PetHeader({required this.pet, required this.asOf});
+  const _PetHeader({
+    required this.pet,
+    required this.asOf,
+    required this.onChangeAvatar,
+    required this.onEditProfile,
+  });
 
   final PetProfile pet;
   final DateTime asOf;
+  final VoidCallback onChangeAvatar;
+  final VoidCallback onEditProfile;
 
   @override
   Widget build(BuildContext context) {
     return Semantics(
+      container: true,
+      explicitChildNodes: true,
       label: '宠物档案 ${pet.name}',
       child: Container(
         padding: const EdgeInsets.all(18),
@@ -800,7 +1033,46 @@ class _PetHeader extends StatelessWidget {
         ),
         child: Row(
           children: [
-            const Icon(Icons.pets, color: Colors.white, size: 42),
+            Semantics(
+              label: '更换 ${pet.name} 头像',
+              button: true,
+              child: InkWell(
+                onTap: onChangeAvatar,
+                borderRadius: BorderRadius.circular(28),
+                child: Stack(
+                  alignment: Alignment.bottomRight,
+                  children: [
+                    CircleAvatar(
+                      radius: 28,
+                      backgroundColor: Colors.white.withValues(alpha: 0.24),
+                      backgroundImage: pet.avatarPath == null
+                          ? null
+                          : FileImage(File(pet.avatarPath!)),
+                      child: pet.avatarPath == null
+                          ? const Icon(
+                              Icons.pets,
+                              color: Colors.white,
+                              size: 34,
+                            )
+                          : null,
+                    ),
+                    Container(
+                      width: 22,
+                      height: 22,
+                      decoration: const BoxDecoration(
+                        color: Colors.white,
+                        shape: BoxShape.circle,
+                      ),
+                      child: const Icon(
+                        Icons.photo_camera_outlined,
+                        size: 14,
+                        color: PetjiColors.primary,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
             const SizedBox(width: 14),
             Expanded(
               child: Column(
@@ -820,6 +1092,15 @@ class _PetHeader extends StatelessWidget {
                 ],
               ),
             ),
+            Semantics(
+              label: '编辑 ${pet.name} 基本信息',
+              button: true,
+              child: IconButton(
+                onPressed: onEditProfile,
+                tooltip: '编辑 ${pet.name} 基本信息',
+                icon: const Icon(Icons.edit_outlined, color: Colors.white),
+              ),
+            ),
           ],
         ),
       ),
@@ -833,17 +1114,19 @@ class _MetricCard extends StatelessWidget {
     required this.label,
     required this.value,
     required this.icon,
+    this.helper,
   });
 
   final double width;
   final String label;
   final String value;
   final IconData icon;
+  final String? helper;
 
   @override
   Widget build(BuildContext context) {
     return Semantics(
-      label: '$label $value',
+      label: [label, value, if (helper != null) helper].join(' '),
       child: SizedBox(
         width: width,
         child: Card(
@@ -857,6 +1140,15 @@ class _MetricCard extends StatelessWidget {
                 Text(label, style: Theme.of(context).textTheme.labelMedium),
                 const SizedBox(height: 2),
                 Text(value, style: Theme.of(context).textTheme.titleMedium),
+                if (helper != null) ...[
+                  const SizedBox(height: 4),
+                  Text(
+                    helper!,
+                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                      color: Theme.of(context).colorScheme.onSurfaceVariant,
+                    ),
+                  ),
+                ],
               ],
             ),
           ),

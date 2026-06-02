@@ -89,6 +89,36 @@ class PetProfile {
   final DateTime updatedAt;
   final DateTime? deletedAt;
 
+  PetProfile copyWith({
+    String? name,
+    PetSpecies? species,
+    String? breed,
+    DateTime? birthday,
+    PetSex? sex,
+    bool? isNeutered,
+    Object? avatarPath = _copyWithSentinel,
+    Object? notes = _copyWithSentinel,
+    DateTime? updatedAt,
+    DateTime? deletedAt,
+  }) {
+    return PetProfile(
+      id: id,
+      name: name ?? this.name,
+      species: species ?? this.species,
+      breed: breed ?? this.breed,
+      birthday: birthday ?? this.birthday,
+      sex: sex ?? this.sex,
+      isNeutered: isNeutered ?? this.isNeutered,
+      avatarPath: avatarPath == _copyWithSentinel
+          ? this.avatarPath
+          : avatarPath as String?,
+      notes: notes == _copyWithSentinel ? this.notes : notes as String?,
+      createdAt: createdAt,
+      updatedAt: updatedAt ?? this.updatedAt,
+      deletedAt: deletedAt ?? this.deletedAt,
+    );
+  }
+
   String ageLabel(DateTime asOf) {
     var years = asOf.year - birthday.year;
     var months = asOf.month - birthday.month;

@@ -180,6 +180,7 @@ class _TimelinePageState extends ConsumerState<TimelinePage> {
                     event: item,
                     focused: item.id == widget.focusedEventId,
                     onTap: () => _showEventDetail(context, item),
+                    onDelete: () => _confirmDeleteEvent(context, item),
                   ),
               ],
             ),
@@ -273,6 +274,35 @@ class _TimelinePageState extends ConsumerState<TimelinePage> {
           ),
         );
       },
+    );
+  }
+
+  void _confirmDeleteEvent(BuildContext context, TimelineEvent event) {
+    showDialog<void>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('删除成长记录'),
+        content: Text('确认删除“${event.title}”？此操作不可恢复。'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(),
+            child: const Text('取消'),
+          ),
+          FilledButton(
+            style: FilledButton.styleFrom(
+              backgroundColor: Theme.of(context).colorScheme.error,
+            ),
+            onPressed: () {
+              ref
+                  .read(appSnapshotProvider.notifier)
+                  .deleteTimelineEvent(event.id);
+              Navigator.of(dialogContext).pop();
+              _showMessage(context, '成长记录已删除');
+            },
+            child: const Text('确认删除'),
+          ),
+        ],
+      ),
     );
   }
 
@@ -449,13 +479,12 @@ CalendarGridCellData _timelineDayCell({
   required VoidCallback onTap,
 }) {
   final eventCount = summary?.eventCount ?? 0;
-  final mediaCount = summary?.mediaCount ?? 0;
   return CalendarGridCellData(
     title: '$day号',
-    subtitle: eventCount == 0 ? null : '媒体$mediaCount条，事件$eventCount条',
+    subtitle: eventCount == 0 ? null : '$eventCount条事件',
     selected: selected,
     hasContent: eventCount > 0,
-    semanticLabel: '$day号成长线 媒体$mediaCount条 事件$eventCount条',
+    semanticLabel: '$day号成长线 $eventCount条事件',
     onTap: onTap,
   );
 }
@@ -465,11 +494,13 @@ class _TimelineTile extends StatelessWidget {
     required this.event,
     required this.focused,
     required this.onTap,
+    required this.onDelete,
   });
 
   final TimelineEvent event;
   final bool focused;
   final VoidCallback onTap;
+  final VoidCallback onDelete;
 
   @override
   Widget build(BuildContext context) {
@@ -488,7 +519,17 @@ class _TimelineTile extends StatelessWidget {
                   Text(event.note!),
                 ],
               ),
-        trailing: const Icon(Icons.chevron_right),
+        trailing: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            IconButton(
+              onPressed: onDelete,
+              tooltip: '删除成长记录 ${event.title}',
+              icon: const Icon(Icons.delete_outline),
+            ),
+            const Icon(Icons.chevron_right),
+          ],
+        ),
       ),
     );
     if (!focused) {

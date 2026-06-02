@@ -218,7 +218,46 @@ class _ExpensesPageState extends ConsumerState<ExpensesPage> {
       subtitle: Text(
         '${expenseCategoryLabel(entry.category)} · ${_dateLabel(entry.spentAt)}',
       ),
-      trailing: Text(moneyLabel(entry.amountCents)),
+      trailing: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text(moneyLabel(entry.amountCents)),
+          IconButton(
+            onPressed: () => _confirmDeleteExpense(context, entry),
+            tooltip: '删除消费 ${entry.title}',
+            icon: const Icon(Icons.delete_outline),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _confirmDeleteExpense(BuildContext context, ExpenseEntry entry) {
+    showDialog<void>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('删除消费'),
+        content: Text('确认删除“${entry.title}”？此操作不可恢复。'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(),
+            child: const Text('取消'),
+          ),
+          FilledButton(
+            style: FilledButton.styleFrom(
+              backgroundColor: Theme.of(context).colorScheme.error,
+            ),
+            onPressed: () {
+              ref.read(appSnapshotProvider.notifier).deleteExpense(entry.id);
+              Navigator.of(dialogContext).pop();
+              ScaffoldMessenger.of(context)
+                ..hideCurrentSnackBar()
+                ..showSnackBar(const SnackBar(content: Text('消费已删除')));
+            },
+            child: const Text('确认删除'),
+          ),
+        ],
+      ),
     );
   }
 

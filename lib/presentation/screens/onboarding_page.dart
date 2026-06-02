@@ -10,6 +10,7 @@ import '../../application/app_providers.dart';
 import '../../domain/models.dart';
 import '../formatters.dart';
 import '../theme/petji_theme.dart';
+import '../widgets/breed_selector.dart';
 
 class OnboardingPage extends ConsumerStatefulWidget {
   const OnboardingPage({super.key});
@@ -21,15 +22,14 @@ class OnboardingPage extends ConsumerStatefulWidget {
 class _OnboardingPageState extends ConsumerState<OnboardingPage> {
   final _formKey = GlobalKey<FormState>();
   final _nameController = TextEditingController();
-  final _breedController = TextEditingController();
   PetSpecies _species = PetSpecies.cat;
+  String _breed = '';
   DateTime _birthday = DateTime.now();
   String? _avatarPath;
 
   @override
   void dispose() {
     _nameController.dispose();
-    _breedController.dispose();
     super.dispose();
   }
 
@@ -97,17 +97,6 @@ class _OnboardingPageState extends ConsumerState<OnboardingPage> {
                         ),
                       ),
                       const SizedBox(height: 14),
-                      Semantics(
-                        label: '品种输入框',
-                        textField: true,
-                        child: TextFormField(
-                          controller: _breedController,
-                          decoration: const InputDecoration(
-                            labelText: '品种（可选）',
-                          ),
-                        ),
-                      ),
-                      const SizedBox(height: 16),
                       SegmentedButton<PetSpecies>(
                         segments: const [
                           ButtonSegment(
@@ -128,8 +117,16 @@ class _OnboardingPageState extends ConsumerState<OnboardingPage> {
                         ],
                         selected: {_species},
                         onSelectionChanged: (selection) {
-                          setState(() => _species = selection.first);
+                          setState(() {
+                            _species = selection.first;
+                            _breed = '';
+                          });
                         },
+                      ),
+                      const SizedBox(height: 14),
+                      BreedSelector(
+                        species: _species,
+                        onChanged: (value) => _breed = value,
                       ),
                       const SizedBox(height: 14),
                       Semantics(
@@ -201,7 +198,7 @@ class _OnboardingPageState extends ConsumerState<OnboardingPage> {
         .registerPet(
           name: _nameController.text,
           species: _species,
-          breed: _breedController.text,
+          breed: _breed,
           birthday: _birthday,
           avatarPath: _avatarPath,
         );

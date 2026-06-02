@@ -81,7 +81,8 @@ void main() {
     }
     expect(find.text('22号'), findsOneWidget);
     expect(find.text('22日'), findsNothing);
-    expect(find.text('媒体1条，事件1条'), findsOneWidget);
+    expect(find.text('1条事件'), findsOneWidget);
+    expect(find.text('媒体1条，事件1条'), findsNothing);
 
     await tester.tap(find.text('年').first);
     await tester.pumpAndSettle();
@@ -123,5 +124,23 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.byType(SegmentedButton<TimelineEventType>), findsNothing);
     expect(find.text('选择照片或视频'), findsOneWidget);
+  });
+
+  testWidgets('timeline day event can be deleted', (tester) async {
+    await tester.pumpWidget(
+      PetjiApp(initialSnapshot: AppSnapshot.seed(now: DateTime(2026, 6, 1))),
+    );
+
+    await tester.tap(find.text('成长线'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('日').first);
+    await tester.pumpAndSettle();
+    await tester.tap(find.byTooltip('删除成长记录 第一次到家'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('确认删除'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('成长记录已删除'), findsOneWidget);
+    expect(find.text('第一次到家'), findsNothing);
   });
 }

@@ -33,6 +33,26 @@ void main() {
     expect(find.text('¥20.00'), findsOneWidget);
   });
 
+  testWidgets('expense day item can be deleted', (tester) async {
+    await tester.pumpWidget(
+      PetjiApp(initialSnapshot: AppSnapshot.seed(now: DateTime(2026, 6, 1))),
+    );
+
+    await tester.tap(find.text('消费'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('日').first);
+    await tester.pumpAndSettle();
+    await tester.drag(find.byType(ListView), const Offset(0, -260));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byTooltip('删除消费 猫粮'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('确认删除'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('消费已删除'), findsOneWidget);
+    expect(find.text('猫粮'), findsNothing);
+  });
+
   testWidgets(
     'expense page shows colored legend and period grouping controls',
     (tester) async {

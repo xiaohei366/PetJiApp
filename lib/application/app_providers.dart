@@ -79,6 +79,69 @@ class PetjiController extends StateNotifier<AppSnapshot> {
     return pet;
   }
 
+  void updatePetAvatar(String petId, String? avatarPath) {
+    final now = _now;
+    final exists = state.pets.any(
+      (pet) => pet.id == petId && pet.deletedAt == null,
+    );
+    if (!exists) {
+      throw StateError('Pet profile does not exist: $petId');
+    }
+    _commit(
+      state.copyWith(
+        pets: [
+          for (final pet in state.pets)
+            if (pet.id == petId)
+              pet.copyWith(avatarPath: avatarPath, updatedAt: now)
+            else
+              pet,
+        ],
+      ),
+    );
+  }
+
+  void updatePetProfile({
+    required String petId,
+    required String name,
+    required DateTime birthday,
+    required PetSpecies species,
+    required String breed,
+    PetSex sex = PetSex.unknown,
+    bool isNeutered = false,
+    String? notes,
+  }) {
+    final now = _now;
+    final trimmedName = name.trim();
+    if (trimmedName.isEmpty) {
+      throw ArgumentError.value(name, 'name', 'Pet name cannot be empty.');
+    }
+    final trimmedNotes = notes?.trim();
+    var exists = false;
+    final pets = [
+      for (final pet in state.pets)
+        if (pet.id == petId && pet.deletedAt == null)
+          pet.copyWith(
+            name: trimmedName,
+            species: species,
+            breed: breed.trim(),
+            birthday: birthday,
+            sex: sex,
+            isNeutered: isNeutered,
+            notes: trimmedNotes == null || trimmedNotes.isEmpty
+                ? null
+                : trimmedNotes,
+            updatedAt: now,
+          )
+        else
+          pet,
+    ];
+    exists = state.pets.any((pet) => pet.id == petId && pet.deletedAt == null);
+    if (!exists) {
+      throw StateError('Pet profile does not exist: $petId');
+    }
+    _commit(state.copyWith(pets: pets));
+  }
+
   WeightRecord addWeight({
     required int grams,
     DateTime? measuredAt,
@@ -244,6 +307,21 @@ class PetjiController extends StateNotifier<AppSnapshot> {
     );
   }
 
+  void deleteTodo(String todoId) {
+    final todo = state.todos.where((item) => item.id == todoId).firstOrNull;
+    if (todo == null) {
+      return;
+    }
+    if (todo.status == TodoStatus.open) {
+      _notificationScheduler.cancelTodo(todo.id);
+    }
+    _commit(
+      state.copyWith(
+        todos: state.todos.where((item) => item.id != todoId).toList(),
+      ),
+    );
+  }
+
   ExpenseEntry addExpense({
     required String title,
     required int amountCents,
@@ -268,6 +346,26 @@ class PetjiController extends StateNotifier<AppSnapshot> {
     );
     _commit(state.copyWith(expenses: [...state.expenses, entry]));
     return entry;
+  }
+
+  void deleteExpense(String expenseId) {
+    _commit(
+      state.copyWith(
+        expenses: state.expenses
+            .where((entry) => entry.id != expenseId)
+            .toList(),
+      ),
+    );
+  }
+
+  void deleteTimelineEvent(String eventId) {
+    _commit(
+      state.copyWith(
+        timelineEvents: state.timelineEvents
+            .where((event) => event.id != eventId)
+            .toList(),
+      ),
+    );
   }
 
   void deletePetHard(String petId) {

@@ -166,6 +166,7 @@ class _RecordsPageState extends ConsumerState<RecordsPage> {
                           .read(appSnapshotProvider.notifier)
                           .toggleTodo(todo.id);
                     },
+                    onDelete: () => _confirmDeleteTodo(context, todo),
                   ),
               ],
             ),
@@ -276,6 +277,33 @@ class _RecordsPageState extends ConsumerState<RecordsPage> {
     );
   }
 
+  void _confirmDeleteTodo(BuildContext context, TodoItem todo) {
+    showDialog<void>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('删除待办'),
+        content: Text('确认删除“${todo.title}”？此操作不可恢复。'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(),
+            child: const Text('取消'),
+          ),
+          FilledButton(
+            style: FilledButton.styleFrom(
+              backgroundColor: Theme.of(context).colorScheme.error,
+            ),
+            onPressed: () {
+              ref.read(appSnapshotProvider.notifier).deleteTodo(todo.id);
+              Navigator.of(dialogContext).pop();
+              _showMessage('待办已删除');
+            },
+            child: const Text('确认删除'),
+          ),
+        ],
+      ),
+    );
+  }
+
   DateTime _previous(DateTime anchor) => switch (_scope) {
     PeriodScope.year => DateTime(anchor.year - 1),
     PeriodScope.month => DateTime(anchor.year, anchor.month - 1),
@@ -355,11 +383,13 @@ class _TodoTile extends StatelessWidget {
     required this.todo,
     required this.now,
     required this.onChanged,
+    required this.onDelete,
   });
 
   final TodoItem todo;
   final DateTime now;
   final ValueChanged<bool?> onChanged;
+  final VoidCallback onDelete;
 
   @override
   Widget build(BuildContext context) {
@@ -381,7 +411,11 @@ class _TodoTile extends StatelessWidget {
             ? '未设置日期'
             : dueOffsetLabel(dueAt, now),
       ),
-      secondary: const Icon(Icons.alarm_outlined),
+      secondary: IconButton(
+        onPressed: onDelete,
+        tooltip: '删除待办 ${todo.title}',
+        icon: const Icon(Icons.delete_outline),
+      ),
       checkboxSemanticLabel: '完成待办 ${todo.title}',
     );
   }
