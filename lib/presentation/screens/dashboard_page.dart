@@ -1135,23 +1135,45 @@ class _MetricCard extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Icon(icon, color: PetjiColors.cta),
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Icon(icon, color: PetjiColors.cta),
+                    const Spacer(),
+                    if (helper != null) _MetricChip(label: helper!),
+                  ],
+                ),
                 const SizedBox(height: 10),
                 Text(label, style: Theme.of(context).textTheme.labelMedium),
                 const SizedBox(height: 2),
                 Text(value, style: Theme.of(context).textTheme.titleMedium),
-                if (helper != null) ...[
-                  const SizedBox(height: 4),
-                  Text(
-                    helper!,
-                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                      color: Theme.of(context).colorScheme.onSurfaceVariant,
-                    ),
-                  ),
-                ],
               ],
             ),
           ),
+        ),
+      ),
+    );
+  }
+}
+
+class _MetricChip extends StatelessWidget {
+  const _MetricChip({required this.label});
+
+  final String label;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+      decoration: BoxDecoration(
+        color: PetjiColors.primary.withValues(alpha: 0.10),
+        borderRadius: BorderRadius.circular(999),
+      ),
+      child: Text(
+        label,
+        style: Theme.of(context).textTheme.labelSmall?.copyWith(
+          color: PetjiColors.primary,
+          fontWeight: FontWeight.w700,
         ),
       ),
     );

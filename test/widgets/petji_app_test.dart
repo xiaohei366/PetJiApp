@@ -47,6 +47,30 @@ void main() {
     expect(find.text('已绝育'), findsOneWidget);
   });
 
+  testWidgets('dashboard metric cards keep equal height with neuter chip', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      PetjiApp(initialSnapshot: AppSnapshot.seed(now: DateTime(2026, 6, 1))),
+    );
+
+    final vaccineLabelTop = tester.getTopLeft(find.text('疫苗')).dy;
+    final neuterChipTop = tester.getTopLeft(find.text('已绝育')).dy;
+    final vaccineLabelLeft = tester.getTopLeft(find.text('疫苗')).dx;
+    final neuterChipLeft = tester.getTopLeft(find.text('已绝育')).dx;
+
+    expect(neuterChipTop, lessThanOrEqualTo(vaccineLabelTop));
+    expect(neuterChipLeft, greaterThan(vaccineLabelLeft));
+
+    final heights = [
+      _metricCardSize(tester, find.text('年龄')).height,
+      _metricCardSize(tester, find.text('4.2kg')).height,
+      _metricCardSize(tester, find.text('疫苗')).height,
+      _metricCardSize(tester, find.text('本月消费')).height,
+    ];
+    expect(heights.toSet(), hasLength(1));
+  });
+
   testWidgets('dashboard vaccine metric shows unneutered status', (
     tester,
   ) async {
@@ -249,6 +273,11 @@ AppSnapshot _singleUnneuteredPetSnapshot() {
     updatedAt: now,
   );
   return AppSnapshot.empty(now: now).copyWith(activePetId: pet.id, pets: [pet]);
+}
+
+Size _metricCardSize(WidgetTester tester, Finder child) {
+  final card = find.ancestor(of: child, matching: find.byType(Card)).first;
+  return tester.getSize(card);
 }
 
 AppSnapshot _timelineHeavySnapshot() {
