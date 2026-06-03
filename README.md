@@ -64,6 +64,30 @@ flutter build apk --debug
 flutter build apk --release
 ```
 
+普通安卓真机建议使用带 ARM Flutter 引擎的发布包：
+
+```powershell
+flutter build apk --release --target-platform android-arm,android-arm64
+```
+
+产物路径：
+
+```text
+build/app/outputs/flutter-apk/app-release.apk
+```
+
+如果安装后启动即闪退，并在日志中看到类似信息：
+
+```text
+Could not find 'libflutter.so'. Looked for: [arm64-v8a, armeabi-v7a, armeabi], but only found: [x86_64].
+```
+
+说明安装的 APK 只包含 x86_64 Flutter 引擎，适合 x86_64 模拟器，不适合普通 ARM 安卓手机。请重新执行上面的 `--target-platform android-arm,android-arm64` 发布包命令，并安装新的 `app-release.apk`。调试真机时也可以显式指定：
+
+```powershell
+flutter build apk --debug --target-platform android-arm64
+```
+
 正式发布前还需要配置 Android 签名、隐私政策、媒体权限说明、文件访问说明和通知权限说明。Android 调试图标已使用项目内生成资产替换。
 
 ## 数据模型

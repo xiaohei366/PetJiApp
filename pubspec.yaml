@@ -50,6 +50,7 @@ dependencies:
   archive: ^4.0.9
   share_plus: ^13.1.0
   timezone: ^0.10.1
+  open_filex: ^4.7.0
 
 dev_dependencies:
   flutter_test:

@@ -3,6 +3,7 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:open_filex/open_filex.dart';
 import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
 
@@ -238,43 +239,68 @@ class _TimelinePageState extends ConsumerState<TimelinePage> {
       showDragHandle: true,
       builder: (sheetContext) {
         return SafeArea(
-          child: ListView(
-            shrinkWrap: true,
+          child: SingleChildScrollView(
             padding: const EdgeInsets.fromLTRB(20, 0, 20, 20),
-            children: [
-              Text('成长记录详情', style: Theme.of(context).textTheme.titleLarge),
-              const SizedBox(height: 12),
-              Text(event.title, style: Theme.of(context).textTheme.titleMedium),
-              const SizedBox(height: 8),
-              Text(
-                '${dateLabel(event.happenedAt)} · ${timelineEventTypeLabel(event.type)}',
-              ),
-              if (event.note != null && event.note!.isNotEmpty) ...[
-                const SizedBox(height: 12),
-                Text(event.note!),
-              ],
-              if (event.mediaPath != null || event.filePath != null) ...[
-                const SizedBox(height: 12),
-                ListTile(
-                  contentPadding: EdgeInsets.zero,
-                  leading: const Icon(Icons.attach_file),
-                  title: const Text('附件'),
-                  subtitle: Text(event.mediaPath ?? event.filePath!),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        '成长记录详情',
+                        style: Theme.of(context).textTheme.titleLarge,
+                      ),
+                    ),
+                    TextButton(
+                      onPressed: () => Navigator.of(sheetContext).pop(),
+                      child: const Text('关闭'),
+                    ),
+                  ],
                 ),
-              ],
-              const SizedBox(height: 16),
-              Align(
-                alignment: Alignment.centerRight,
-                child: TextButton(
-                  onPressed: () => Navigator.of(sheetContext).pop(),
-                  child: const Text('关闭'),
+                const SizedBox(height: 12),
+                Text(
+                  event.title,
+                  style: Theme.of(context).textTheme.titleMedium,
                 ),
-              ),
-            ],
+                const SizedBox(height: 8),
+                Text(
+                  '${dateLabel(event.happenedAt)} · ${timelineEventTypeLabel(event.type)}',
+                ),
+                if (event.note != null && event.note!.isNotEmpty) ...[
+                  const SizedBox(height: 12),
+                  Text(event.note!),
+                ],
+                if (event.mediaPath != null || event.filePath != null) ...[
+                  const SizedBox(height: 12),
+                  _TimelineAttachmentPreview(
+                    event: event,
+                    onOpen: (path) => _openAttachment(context, path),
+                  ),
+                ],
+                const SizedBox(height: 8),
+              ],
+            ),
           ),
         );
       },
     );
+  }
+
+  Future<void> _openAttachment(BuildContext context, String path) async {
+    final result = await OpenFilex.open(path, type: _contentTypeForPath(path));
+    if (result.type == ResultType.done || !context.mounted) {
+      return;
+    }
+    final message = switch (result.type) {
+      ResultType.fileNotFound => '文件不存在',
+      ResultType.noAppToOpen => '没有可打开该文件的应用',
+      ResultType.permissionDenied => '没有权限打开该文件',
+      ResultType.error => '打开文件失败',
+      ResultType.done => '已打开文件',
+    };
+    _showMessage(context, message);
   }
 
   void _confirmDeleteEvent(BuildContext context, TimelineEvent event) {
@@ -331,6 +357,155 @@ class _TimelinePageState extends ConsumerState<TimelinePage> {
     ScaffoldMessenger.of(context)
       ..hideCurrentSnackBar()
       ..showSnackBar(SnackBar(content: Text(message)));
+  }
+}
+
+class _TimelineAttachmentPreview extends StatelessWidget {
+  const _TimelineAttachmentPreview({required this.event, required this.onOpen});
+
+  final TimelineEvent event;
+  final ValueChanged<String> onOpen;
+
+  @override
+  Widget build(BuildContext context) {
+    final mediaPath = event.mediaPath;
+    if (mediaPath != null && _isVideoPath(mediaPath, event.type)) {
+      return _VideoAttachmentCard(
+        title: event.title,
+        path: mediaPath,
+        onOpen: () => onOpen(mediaPath),
+      );
+    }
+    if (mediaPath != null) {
+      return _ImageAttachmentPreview(title: event.title, path: mediaPath);
+    }
+    final filePath = event.filePath;
+    if (filePath == null) {
+      return const SizedBox.shrink();
+    }
+    return _FileAttachmentCard(path: filePath, onOpen: () => onOpen(filePath));
+  }
+}
+
+class _ImageAttachmentPreview extends StatelessWidget {
+  const _ImageAttachmentPreview({required this.title, required this.path});
+
+  final String title;
+  final String path;
+
+  @override
+  Widget build(BuildContext context) {
+    final image = _isAssetPath(path)
+        ? Image.asset(path, fit: BoxFit.cover, excludeFromSemantics: true)
+        : Image.file(
+            File(path),
+            fit: BoxFit.cover,
+            excludeFromSemantics: true,
+            errorBuilder: (context, error, stackTrace) {
+              return const Center(child: Text('图片文件不可用'));
+            },
+          );
+    return Semantics(
+      label: '成长记录图片 $title',
+      image: true,
+      child: ExcludeSemantics(
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(12),
+          child: SizedBox(width: double.infinity, height: 220, child: image),
+        ),
+      ),
+    );
+  }
+}
+
+class _VideoAttachmentCard extends StatelessWidget {
+  const _VideoAttachmentCard({
+    required this.title,
+    required this.path,
+    required this.onOpen,
+  });
+
+  final String title;
+  final String path;
+  final VoidCallback onOpen;
+
+  @override
+  Widget build(BuildContext context) {
+    return Semantics(
+      container: true,
+      label: '成长记录视频 $title',
+      button: true,
+      child: ExcludeSemantics(
+        child: Container(
+          padding: const EdgeInsets.all(14),
+          decoration: BoxDecoration(
+            color: const Color(0xFFFFF7ED),
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: const Color(0xFFFFEDD5)),
+          ),
+          child: Row(
+            children: [
+              Container(
+                width: 48,
+                height: 48,
+                decoration: BoxDecoration(
+                  color: PetjiColors.primary.withValues(alpha: 0.12),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: const Icon(
+                  Icons.play_circle_fill_outlined,
+                  color: PetjiColors.primary,
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      p.basename(path),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: Theme.of(context).textTheme.titleSmall,
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      '视频',
+                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                        color: Theme.of(context).colorScheme.onSurfaceVariant,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              TextButton.icon(
+                onPressed: onOpen,
+                icon: const Icon(Icons.open_in_new),
+                label: const Text('用系统播放器打开'),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _FileAttachmentCard extends StatelessWidget {
+  const _FileAttachmentCard({required this.path, required this.onOpen});
+
+  final String path;
+  final VoidCallback onOpen;
+
+  @override
+  Widget build(BuildContext context) {
+    return ListTile(
+      contentPadding: EdgeInsets.zero,
+      leading: const Icon(Icons.attach_file),
+      title: Text(p.basename(path)),
+      subtitle: const Text('附件'),
+      trailing: TextButton(onPressed: onOpen, child: const Text('打开文件')),
+    );
   }
 }
 
@@ -565,4 +740,37 @@ class _TimelineDraft {
   final String title;
   final String description;
   final String? mediaPath;
+}
+
+bool _isAssetPath(String path) => path.startsWith('assets/');
+
+bool _isVideoPath(String path, TimelineEventType type) {
+  if (type == TimelineEventType.video) {
+    return true;
+  }
+  final lower = path.toLowerCase();
+  return lower.endsWith('.mp4') ||
+      lower.endsWith('.mov') ||
+      lower.endsWith('.m4v') ||
+      lower.endsWith('.avi') ||
+      lower.endsWith('.mkv') ||
+      lower.endsWith('.webm');
+}
+
+String? _contentTypeForPath(String path) {
+  final lower = path.toLowerCase();
+  if (_isVideoPath(lower, TimelineEventType.record)) {
+    return 'video/*';
+  }
+  if (lower.endsWith('.jpg') ||
+      lower.endsWith('.jpeg') ||
+      lower.endsWith('.png') ||
+      lower.endsWith('.webp') ||
+      lower.endsWith('.gif')) {
+    return 'image/*';
+  }
+  if (lower.endsWith('.pdf')) {
+    return 'application/pdf';
+  }
+  return null;
 }

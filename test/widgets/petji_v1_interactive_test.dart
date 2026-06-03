@@ -126,6 +126,45 @@ void main() {
     expect(find.text('选择照片或视频'), findsOneWidget);
   });
 
+  testWidgets('timeline detail previews photo instead of showing file path', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      PetjiApp(initialSnapshot: AppSnapshot.seed(now: DateTime(2026, 6, 1))),
+    );
+
+    await tester.tap(find.text('成长线'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('日').first);
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('第一次到家'));
+    await tester.pumpAndSettle();
+
+    expect(find.bySemanticsLabel('成长记录图片 第一次到家'), findsOneWidget);
+    expect(find.byType(Image), findsOneWidget);
+    expect(find.textContaining('assets/images/generated'), findsNothing);
+  });
+
+  testWidgets('timeline detail offers system player for video media', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      PetjiApp(initialSnapshot: _videoTimelineSnapshot()),
+    );
+
+    await tester.tap(find.text('成长线'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('日').first);
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('第一次奔跑'));
+    await tester.pumpAndSettle();
+
+    expect(find.bySemanticsLabel('成长记录视频 第一次奔跑'), findsOneWidget);
+    expect(find.text('用系统播放器打开'), findsOneWidget);
+    expect(find.textContaining('clip.mp4'), findsOneWidget);
+    expect(find.textContaining('/storage/emulated'), findsNothing);
+  });
+
   testWidgets('timeline day event can be deleted', (tester) async {
     await tester.pumpWidget(
       PetjiApp(initialSnapshot: AppSnapshot.seed(now: DateTime(2026, 6, 1))),
@@ -143,4 +182,24 @@ void main() {
     expect(find.text('成长记录已删除'), findsOneWidget);
     expect(find.text('第一次到家'), findsNothing);
   });
+}
+
+AppSnapshot _videoTimelineSnapshot() {
+  final now = DateTime(2026, 6, 1);
+  final seed = AppSnapshot.seed(now: now);
+  final petId = seed.activePetId!;
+  return seed.copyWith(
+    timelineEvents: [
+      TimelineEvent(
+        id: 'video-event',
+        petId: petId,
+        type: TimelineEventType.video,
+        happenedAt: DateTime(2026, 6, 1, 12),
+        title: '第一次奔跑',
+        mediaPath: '/storage/emulated/0/Movies/petji/clip.mp4',
+        createdAt: now,
+        updatedAt: now,
+      ),
+    ],
+  );
 }
